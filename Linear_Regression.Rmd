@@ -1,0 +1,462 @@
+---
+title: "Homework 5"
+author: "Akhilesh Sureddi"
+date: "2022-11-27"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE,message = FALSE)
+
+library(ggplot2)
+library(ggpubr)
+library(GGally)
+library(knitr)
+library(gridExtra)
+library(rpart)
+library(tufte)
+library(investr)
+theme_set(theme_bw())
+#palette("Okabe-Ito")
+
+```
+
+# {.tabset}
+
+## **Introduction** {.tabset}
+
+Alumni donations are an important source of revenue for colleges and universities. If administrators could determine the factors that influence increases in the percentage of alumni who donate, they might be able to implement policies that could lead to increased revenues.
+
+A study shows that students who have more access to the faculty are more likely to be satisfied. As a result, one might suspect that smaller class sizes and lower student-faculty ratios might lead to a higher percentage of satisfied graduates, which in turn might lead to an increase in the percentage of alumni who donate.
+
+In this project, we will develop a linear regression model to study the factors affecting alumni donation in schools.
+
+## **Data**
+
+The data set comes from the 2006 ASA Data Expo and contains data for 48 national universities (America’s Best Colleges, Year 2000 Edition).
+
+#### Snapshot of the data:
+```{r cars, echo=FALSE}
+url <- "https://bgreenwell.github.io/uc-bana7052/data/alumni.csv"
+alumni <- read.csv(url)
+
+#alumni <- read.csv("D:\\Ucin BANA\\Courses\\BANA 7052\\Content\\Week #2\\Week_2\\Week_2\\alumni.csv")
+alumni |> head(5) |> kable() 
+
+```
+
+
+
+## **Exploratory Data Analysis**
+
+**Following are the observations based on Univariate and Bivariate Analysis:**
+
++ There are no missing values and outliers in the data
++ log transformation on alumni_giving_rate doesn't have much impact
++ There exist a positive relationship between the Percent of Classes Under 20 and alumni_giving_rate
++ There exist a negative relationship between the Student Faculty Ratio and alumni_giving_rate
++ There exist a relationship between the  private/public and alumni_giving_rate
++ The correlation between student faculty ratio and % classes under 20 is -0.786
++ The correlation between student faculty ratio and Alumni giving rate is -0.742
+
+
+### Univariate Analysis
+
+#### Response Variable: alumni_giving_rate
+
+```{r echo=FALSE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
+
+plot1 <- ggplot(alumni, aes(alumni_giving_rate)) + geom_histogram() + 
+  ggtitle("Histogram of the response variable Y") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+plot2 <- ggplot(alumni, aes(log(alumni_giving_rate))) + geom_histogram() + 
+  ggtitle("Histogram of the log transposed response variable Y") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+plot3 <- ggplot(alumni, aes(y = alumni_giving_rate)) + geom_boxplot() + 
+  ggtitle("Boxplot to look for outliers") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+ggarrange(plot1, plot2,plot3, nrow = 1, ncol = 3)
+
+
+```
+
+
+#### Dependent Variable: Percent of Classes Under 20 
+
+```{r echo=FALSE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
+
+plot1 <- ggplot(alumni, aes(percent_of_classes_under_20)) + geom_histogram() + 
+  ggtitle("Histogram of the variable") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+plot2 <- ggplot(alumni, aes(y = percent_of_classes_under_20)) + geom_boxplot() + 
+  ggtitle("Boxplot to look for outliers") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+plot3 <- ggplot(alumni, aes(percent_of_classes_under_20, alumni_giving_rate)) + 
+  geom_point() + geom_smooth(method = "lm", se = FALSE, color = "red") +
+  ggtitle("Plot between alumni and % classes_under_20") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+ggarrange(plot1, plot2, plot3, nrow = 1, ncol = 3)
+
+
+```
+
+#### Dependent Variable: Student Faculty Ratio
+
+```{r  fig.height=4, fig.width=7, echo=FALSE, message=FALSE, warning=FALSE}
+
+plot1 <- ggplot(alumni, aes(student_faculty_ratio)) + geom_histogram() + 
+  ggtitle("Histogram of the variable") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+plot2 <- ggplot(alumni, aes(y = student_faculty_ratio)) + geom_boxplot() + 
+  ggtitle("Boxplot to look for outliers") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+plot3 <- ggplot(alumni, aes(student_faculty_ratio, alumni_giving_rate)) + 
+  geom_point() + geom_smooth(method = "lm", se = FALSE, color = "red") +
+  ggtitle("Scatter plot relating the two variables") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+ggarrange(plot1, plot2, plot3, nrow = 1, ncol = 3)
+
+
+```
+
+#### Dependent Variable: Private
+
+```{r echo=FALSE, fig.height=4,  message=FALSE, warning=FALSE}
+
+plot1 <- ggplot(alumni, aes(private)) + geom_bar() + 
+  ggtitle("Barchart showing the count of schools") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+
+plot2 <- ggplot(alumni, aes(x = alumni_giving_rate, y = student_faculty_ratio, 
+                            group = private, color = private)) + 
+  geom_point() + geom_smooth(method = "lm", se = FALSE, color = "red") +
+  ggtitle("The public & private schools have differing donation rates") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+
+plot3 <- ggplot(alumni, aes(x = alumni_giving_rate, y = percent_of_classes_under_20 , 
+                            group = private, color = private)) + 
+  geom_point() + geom_smooth(method = "lm", se = FALSE, color = "red") +
+  ggtitle("The public & private schools have differing donation rates") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+
+ggarrange(plot1, plot2, plot3, nrow = 1, ncol = 3)
+
+```
+
+### Bivariate Analysis 
+
+```{r echo=FALSE, fig.height=6, message=FALSE, warning=FALSE}
+
+alumni$private <- as.factor(alumni$private)
+
+ggpairs(alumni,columns = c("percent_of_classes_under_20", "student_faculty_ratio" , "private", "alumni_giving_rate"),
+        columnLabels = c("%Classes_under_20", "Student_faculty_Ratio","Private","Alumni_Giving_Rate"),
+        aes(color = as.factor(alumni$private)),                             # Separate data by levels of vs
+        upper = list(continuous = wrap('cor', size = 3)),
+        lower = list(combo = wrap("facethist", bins = 30)),
+        diag = list(continuous = wrap("densityDiag", alpha = 0.5)),
+        title = "Bivariate analysis of Response variable and other Predictor Variables")
+```
+
+
+
+## **Model**
+
+### Basic Model Results
+```{r, echo=FALSE}
+
+alumni$private <- as.factor(alumni$private)
+
+model1 <- lm(alumni_giving_rate ~ student_faculty_ratio + 
+               percent_of_classes_under_20 + private , 
+              data = alumni)  
+model1 %>% summary()
+
+```
+
+### Basic Model Diagnostics
+```{r echo=FALSE, fig.height=6, fig.width=7, message=FALSE, warning=FALSE}
+
+
+# Plot of residuals against fitted values (non-constant variance and non-linearity)
+p1 <- ggplot(model1, aes(x = .fitted, y = model1$residuals)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red2") +
+  geom_hline(yintercept = c(-2, 2), linetype = "dotted") +
+  geom_smooth(color = "forestgreen", alpha = 3, se = FALSE) +
+  xlab("Fitted value") +
+  ylab("Standardized residuals") + 
+  ggtitle("Non-constant variance & non-linearity test") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+# Plot of residuals against predictor variable (checking non-linearity).
+p2 <- ggplot(model1, aes(x = alumni$percent_of_classes_under_20, y = model1$residuals)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red2") +
+  geom_hline(yintercept = c(-2, 2), linetype = "dotted") +
+  geom_smooth(color = "forestgreen", method = "auto", se = FALSE) +
+  ylab("Standardized residuals") + 
+  ggtitle("Non-linearity test") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+# Plot of residuals against predictor variable (checking non-linearity).
+p3 <- ggplot(model1, aes(x = alumni$student_faculty_ratio, y = model1$residuals)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red2") +
+  geom_hline(yintercept = c(-2, 2), linetype = "dotted") +
+  geom_smooth(color = "forestgreen", alpha = 0.1, se = FALSE) +
+  ylab("Standardized residuals") + 
+  ggtitle("Non-linearity test") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+# Plot of residuals against predictor variable (checking non-linearity).
+p4 <- ggplot(model1, aes(x = alumni$private, y = model1$residuals)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red2") +
+  geom_hline(yintercept = c(-2, 2), linetype = "dotted") +
+  geom_smooth(color = "forestgreen", alpha = 0.1, se = FALSE) +
+  ylab("Standardized residuals") + 
+  ggtitle("Non-linearity test") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+
+
+# Normal probability Q-Q plot of residuals (non-normality).
+p5 <- ggplot(model1, aes(sample = model1$residuals)) +
+  geom_qq(alpha = 0.3) +
+  geom_qq_line(linetype = "dashed", color = "red2") +
+  xlab("Theoretical quantile") +
+  ylab("Sample quantile") +
+  ggtitle("Non-normality test") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+
+ggarrange(p1, p2, p3,p4, p5, nrow = 2, ncol = 3)
+#plot(model1, which = 1)
+
+```
+
+As seen from the results above, There exists a slight `non linearity` in the response variable and the residuals are not constantly spread. This indicates `heteroskedasticity`.
+
+The model has selected only `student_faculty_ratio` as the significant predictor variable and has Adj.R squared value of 0.55.
+
+
+
+#### Student Faculty Ratio only Model 
+
+First step is to include `student_faculty_ratio` and a polynomial term  of `student_faculty_ratio` to check:
+
+```{r}
+
+
+fit1 <- lm(alumni_giving_rate ~ student_faculty_ratio + I(student_faculty_ratio^2),
+              data = alumni)  
+
+fit1 %>% summary()
+
+#plot(fit1, which = 1)
+
+p1 <- ggplot(fit1, aes(x = fit1$fitted.values, y = fit1$residuals)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red2") +
+  geom_hline(yintercept = c(-2, 2), linetype = "dotted") +
+  geom_smooth(color = "forestgreen", alpha = 3, se = FALSE) +
+  xlab("Fitted value") +
+  ylab("Standardized residuals") + 
+  ggtitle("Non-constant variance & non-linearity test") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+p1
+
+
+```
+
+Though the non linearity has reduced the polynomial term doesn't hold any significance in prediction. So, our approach is to add interaction terms to the models.
+
+
+#### Adding interaction Terms
+
+As we observed in the EDA above, we noticed that there seems to be an interaction between:
++ Private & student_faculty_ratio
++ Private & percent_of_classes_under_20
+
+Next step is to include the interaction terms and check the model results:
+```{r}
+
+fit3 <- lm(alumni_giving_rate ~ student_faculty_ratio + percent_of_classes_under_20 + private +    private:student_faculty_ratio +
+             private:percent_of_classes_under_20,
+              data = alumni)  
+
+fit3 %>% summary()
+
+#plot(fit3, which = 1)
+
+p1 <- ggplot(fit3, aes(x = fit3$fitted.values, y = fit3$residuals)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red2") +
+  geom_hline(yintercept = c(-2, 2), linetype = "dotted") +
+  geom_smooth(color = "forestgreen", alpha = 3, se = FALSE) +
+  xlab("Fitted value") +
+  ylab("Standardized residuals") + 
+  ggtitle("Non-constant variance & non-linearity test") + 
+    theme(plot.title = element_text(size = 8), axis.title = element_text(size = 8))
+p1
+
+
+```
+
+Using the interaction terms also we didn't find any significant improvement in the model as well as predictors. So, our approach is to add the Box cox transformation to the non linearity. And also we used only student faculty ratio because it only has significance.
+
+
+#### Box Cox Transformation:
+
+```{r}
+
+bc <- MASS::boxcox(alumni_giving_rate ~ student_faculty_ratio, data = alumni)
+
+lambda <- bc$x[which.max(bc$y)]
+lambda
+```
+
+
+```{r}
+
+# Scatterplot and fitted model
+alumni$alumni_giving_rate2 <- (alumni$alumni_giving_rate ^ lambda - 1) / lambda
+
+#plot(alumni$alumni_giving_rate2  ~ student_faculty_ratio, data = alumni, pch = 19, las = 1,
+#     col = adjustcolor(1, alpha.f = 0.5))
+
+# Add fitted regression line
+#abline(fit <- lm(alumni_giving_rate2 ~ student_faculty_ratio, data = alumni), lwd = 2,
+#       col = adjustcolor(2, alpha.f = 0.5))
+
+fit4 <- lm(alumni_giving_rate2 ~ student_faculty_ratio, data = alumni)
+
+fit4 %>% summary()
+
+plot(fit4, which = 1)
+
+```
+
+
+```{r}
+
+# Scatterplot and fitted model
+alumni$alumni_giving_rate2 <- (alumni$alumni_giving_rate ^ lambda - 1) / lambda
+
+plot(alumni$alumni_giving_rate2  ~ student_faculty_ratio + private, data = alumni, pch = 19, las = 1,
+     col = adjustcolor(1, alpha.f = 0.5))
+
+# Add fitted regression line
+abline(fit <- lm(alumni_giving_rate2 ~ student_faculty_ratio + private, data = alumni), lwd = 2,
+       col = adjustcolor(2, alpha.f = 0.5))
+
+fit5 <- lm(alumni_giving_rate2 ~ student_faculty_ratio + private, data = alumni)
+
+fit5 %>% summary()
+
+plot(fit5, which = 1)
+
+```
+
+
+```{r}
+
+# Scatterplot and fitted model
+alumni$alumni_giving_rate2 <- (alumni$alumni_giving_rate ^ lambda - 1) / lambda
+
+plot(alumni$alumni_giving_rate2  ~ student_faculty_ratio + private:percent_of_classes_under_20, data = alumni, pch = 19, las = 1,
+     col = adjustcolor(1, alpha.f = 0.5))
+
+# Add fitted regression line
+abline(fit <- lm(alumni_giving_rate2 ~ student_faculty_ratio + private:percent_of_classes_under_20, data = alumni), lwd = 2,
+       col = adjustcolor(2, alpha.f = 0.5))
+
+fit6 <- lm(alumni_giving_rate2 ~ student_faculty_ratio + private:percent_of_classes_under_20, data = alumni)
+
+fit6 %>% summary()
+
+plot(fit6, which = 1)
+
+```
+
+
+```{r}
+
+# Scatterplot and fitted model
+alumni$alumni_giving_rate2 <- (alumni$alumni_giving_rate ^ lambda - 1) / lambda
+
+plot(alumni$alumni_giving_rate2  ~ percent_of_classes_under_20, data = alumni, pch = 19, las = 1,
+     col = adjustcolor(1, alpha.f = 0.5))
+
+# Add fitted regression line
+abline(fit <- lm(alumni_giving_rate2 ~ percent_of_classes_under_20, data = alumni), lwd = 2,
+       col = adjustcolor(2, alpha.f = 0.5))
+
+fit7 <- lm(alumni_giving_rate2 ~ percent_of_classes_under_20, data = alumni)
+
+fit7 %>% summary()
+
+plot(fit7, which = 1)
+
+```
+
+## **Variable selection (FS)** 
+
+
+```{r}
+n = nrow(alumni)
+
+BIC <-c(
+  wagereg1=extractAIC(fit4, k=log(n))[2], wagereg2=extractAIC(fit5, k=log(n))[2],wagereg3= extractAIC(fit6, k=log(n))[2],
+  wagereg4= extractAIC(fit7, k=log(n))[2]
+        )
+
+base <- lm(alumni_giving_rate2  ~ 1 , data=alumni)
+
+full <- lm(alumni_giving_rate2 ~ . + .^2, data=alumni[,c(2,3,5,6)])
+
+full %>% summary()
+```
+
+
+```{r,echo=F}
+
+fwdBIC <- step(base, scope=formula(full), direction="forward", k=log(n))
+```
+
+##BIC
+```{r}
+BIC <-  c(BIC, fwdBIC = extractAIC(fwdBIC, k=log(n))[2])
+BIC
+```
+
+```{r}
+eBIC <- exp(-0.5*(BIC-min(BIC)))
+probs <- eBIC/sum(eBIC)
+probs
+
+```
+
+## **Discussion of Results** 
+
+**Following are the observations:**
+
++ Based on the BIC forward selection resultys we choose the model with least BIC which is alumni_giving_rate2 ~ student_faculty_ratio + private
++ Model statistics for best model is Adjusted R-squared:  61% and BIC value is: 31.13138
++ Alumni rate is transformed using Lambda value of 0.4242424 
++ Intercept: 8.82417, Beta of student_faculty_ratio: -0.21658, Beta of private1: 1.33369
+
